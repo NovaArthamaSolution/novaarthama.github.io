@@ -444,45 +444,101 @@
                     colors: ['#F97316', '#16A34A']
                 },
                 costs: {
-                    hardware:,
-                    license:
+                    hardware: [ 
+                        { cluster: 'Jaringan', dell: 305804, hpe: 184596, lenovo: 167134 },
+                        { cluster: 'Compute Utama', dell: 225000, hpe: 480000, lenovo: 300000 },
+                        { cluster: 'Compute Pendukung', dell: 160000, hpe: 120000, lenovo: 144000 },
+                        { cluster: 'Database', dell: 50000, hpe: 160000, lenovo: 60000 },
+                        { cluster: 'Object Storage', dell: 150000, hpe: 150000, lenovo: 150000 },
+                        ],
+                    license: [
+                        { cluster: 'Jaringan', dell: 305804, hpe: 184596, lenovo: 167134 },
+                        { cluster: 'Compute Utama', dell: 225000, hpe: 480000, lenovo: 300000 },
+                        { cluster: 'Compute Pendukung', dell: 160000, hpe: 120000, lenovo: 144000 },
+                        { cluster: 'Database', dell: 50000, hpe: 160000, lenovo: 60000 },
+                        { cluster: 'Object Storage', dell: 150000, hpe: 150000, lenovo: 150000 },
+                    ]
                 },
                 rackLayouts: {
                     'rack-1': { // Network A
                         name: 'Jaringan A',
-                        devices:
+                        devices: [
+                            { name: 'Cisco Nexus 93180YC-FX', uHeight: 1, brand: 'Cisco' },
+                            { name: 'Arista 7050SX3-48C8', uHeight: 1, brand: 'Arista' },
+                            { name: 'F5 BIG-IP i5800', uHeight: 1, brand: 'F5' },
+                            { name: 'Palo Alto PA-5250', uHeight: 3, brand: 'Palo Alto' }
+                        ]
                     },
                     'rack-2': { // Compute Utama A (5 nodes from 9 total)
                         name: 'Compute Utama A',
-                        devices:
+                        devices: [
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' }
+                        ]
                     },
                     'rack-3': { // Compute Pendukung A (4 nodes from 8 total)
                         name: 'Compute Pendukung A',
-                        devices:
+                        devices: [
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' }
+                        ]
                     },
                     'rack-4': { // Database A (1 node from 2 total)
                         name: 'Database A',
-                        devices:
+                        devices: [
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' }
+                        ]
                     },
                     'rack-5': { // Object Storage (Dedicated Rack)
                         name: 'Object Storage',
-                        devices:
+                        devices: [
+                            { name: 'Dell ObjectScale X560/XF960', uHeight: 42, brand: 'DELL' }
+                            ]
                     },
                     'rack-6': { // Network B (Redundant)
                         name: 'Jaringan B',
-                        devices:
+                        devices: [
+                            { name: 'Cisco Nexus 93180YC-FX', uHeight: 1, brand: 'Cisco' },
+                            { name: 'Arista 7050SX3-48C8', uHeight: 1, brand: 'Arista' },
+                            { name: 'F5 BIG-IP i5800', uHeight: 1, brand: 'F5' },
+                            { name: 'Palo Alto PA-5250', uHeight: 3, brand: 'Palo Alto' }
+                        ]
                     },
                     'rack-7': { // Compute Utama B (4 nodes remaining)
                         name: 'Compute Utama B',
-                        devices:
+                        devices: [
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' }
+                        ]
                     },
                     'rack-8': { // Compute Pendukung B (4 nodes remaining)
                         name: 'Compute Pendukung B',
-                        devices:
+                        devices: 
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' }
+                        ]
                     },
                     'rack-9': { // Database B (1 node remaining)
                         name: 'Database B',
-                        devices:
+                        devices: [
+                            { name: 'Dell XC7625', uHeight: 2, brand: 'DELL' }
+                        ]
+                    },
+                    'rack-10': {
+                        name: "Cadangan"
+                        device: []
                     }
                 }
             };
@@ -548,9 +604,11 @@
                     type: type,
                     data: {
                         labels: [label],
-                        datasets:,
-                            backgroundColor:, // blue, green, orange
-                            borderColor:,
+                        datasets: [{Add commentMore actions
+                            label: label,
+                            data: [initialData],
+                            backgroundColor: ['#3B82F6', '#22C55E', '#F97316'], // blue, green, orange
+                            borderColor: ['#3B82F6', '#22C55E', '#F97316'],
                             borderWidth: 1
                         }]
                     },
@@ -581,15 +639,15 @@
 
             function updateHardwareCharts(vendor) {
                 const vendorData = data.hardware[vendor];
-                charts.nodes.data.datasets.data =;
+                charts.nodes.data.datasets[0].data = [vendorData.nodes];
                 charts.nodes.data.labels = [vendor];
                 charts.nodes.update();
 
-                charts.uHeight.data.datasets.data =;
+                charts.uHeight.data.datasets[0].data = [vendorData.uHeight];
                 charts.uHeight.data.labels = [vendor];
                 charts.uHeight.update();
 
-                charts.power.data.datasets.data =;
+                charts.power.data.datasets[0].data = [vendorData.power];
                 charts.power.data.labels = [vendor];
                 charts.power.update();
             }
@@ -603,7 +661,10 @@
                 type: 'bar',
                 data: {
                     labels: data.license.labels,
-                    datasets:,
+                    datasets: [{
+                        label: 'Biaya Lisensi Tahunan (USD)',
+                        data: data.license.costs,
+                        backgroundColor: ['#F97316', '#16A34A'],
                         borderColor: ['#F97316', '#16A34A'],
                         borderWidth: 1
                     }]
@@ -618,8 +679,7 @@
                         tooltip: {
                              callbacks: {
                                 label: function(context) {
-                                    let label = context.dataset.label |
-| '';
+                                    let label = context.dataset.label || '';
                                     if (label) {
                                         label += ': ';
                                     }
