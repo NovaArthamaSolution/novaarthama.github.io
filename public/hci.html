@@ -1,14 +1,25 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Infografis: Analisis Biaya & Teknologi Pusat Data HCI</title>
+    <title>Dasbor Interaktif: Kajian Biaya Data Center HCI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: The application is designed as a single-page interactive dashboard. This structure was chosen to transform the dense report into an easily digestible and non-linear experience. The user can get a high-level overview from KPI cards and then dive into specific comparisons (Hardware, Licensing) using interactive charts and toggles. This dashboard approach prioritizes user-driven exploration over the report's linear format, making complex data synthesis more intuitive and engaging. The main sections are: Summary, Architecture, Hardware Comparison, License Comparison, Physical Layout, and Cost Estimation, all accessible via a sticky top navigation bar for seamless scrolling. -->
+    <!-- Visualization & Content Choices: 
+        - Goal: Summarize -> Method: KPI Cards (HTML/Tailwind) -> Interaction: Static display of key metrics like total costs for immediate impact. Justification: Provides a quick, high-level understanding of the report's bottom line.
+        - Goal: Inform/Organize -> Method: Architecture Diagram (HTML/Tailwind Grid) -> Interaction: Hover to highlight cluster details. Justification: Visually explains the 5-cluster setup more effectively than text alone.
+        - Goal: Compare Hardware -> Method: Interactive Bar Charts (Chart.js Canvas) -> Interaction: Buttons to filter data by vendor (Dell, HPE, Lenovo). Justification: Allows direct, clutter-free comparison of key hardware metrics (Nodes, U-Height, Power), which is a core requirement of the source report.
+        - Goal: Compare Licensing -> Method: Grouped Bar Chart (Chart.js Canvas) -> Interaction: Static comparison for clarity. Justification: Clearly visualizes the significant cost difference between Nutanix and VMware licensing models.
+        - Goal: Organize Physical Layout -> Method: Rack Containment Diagram (HTML/Tailwind Grid with dynamic content and doors) + Legend Box (HTML/Tailwind) -> Interaction: Displays internal device layout with brands directly, and a legend provides crucial summary statistics for the entire layout (power, switch ports, PDUs, area). Justification: Provides a clear, detailed visual representation of the physical data center setup, including hot/cold aisle containment and security doors, making the HA configuration and exact device placement highly tangible. The legend provides crucial summary statistics for the entire layout.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. All visualizations are built with either Chart.js or structured HTML/CSS, adhering to all constraints.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -16,554 +27,639 @@
         .chart-container {
             position: relative;
             width: 100%;
-            max-width: 600px;
             margin-left: auto;
             margin-right: auto;
-            height: 350px;
+            height: 320px;
             max-height: 400px;
         }
-        @media (min-width: 768px) {
+        @media (min-width: 640px) {
             .chart-container {
                 height: 400px;
+                max-height: 500px;
             }
         }
-        .flow-line {
-            position: absolute;
-            background-color: #58508D;
-            z-index: 0;
+        .nav-link {
+            transition: color 0.3s ease, border-bottom-color 0.3s ease;
         }
-        .flow-line-h {
-            height: 4px;
+        .nav-link:hover, .nav-link.active {
+            color: #2563EB; /* blue-600 */
+            border-bottom-color: #2563EB;
+        }
+        .kpi-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .section-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #1F2937; /* gray-800 */
+            margin-bottom: 1rem;
+        }
+        .section-intro {
+            color: #4B5563; /* gray-600 */
+            max-width: 42rem;
+            margin: 0 auto 2.5rem auto;
+            text-align: center;
+        }
+        .vendor-btn {
+            transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .vendor-btn.active {
+            box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
+        }
+        /* Custom rack styling */
+        .rack-cell {
+            background-color: #1a202c; /* Dark background for rack */
+            border: 1px solid #4a5568;
+            border-radius: 0.5rem;
+            height: 300px; /* Fixed height for visual consistency of 42U */
+            width: 120px; /* Fixed width for visual consistency */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; /* Devices from bottom up */
+            overflow: hidden; /* Hide anything that goes over */
+            position: relative; /* For device unit positioning */
+        }
+        .device-unit {
+            background-color: #4a5568; /* Light gray for devices */
+            border-top: 1px solid #2d3748;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.6rem; /* Very small font for details */
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+        .empty-space {
+            flex-grow: 1; /* Fills remaining space */
+            background-color: #1a202c;
+        }
+        .rack-label {
+            font-size: 0.75rem; /* text-xs */
+            font-weight: 600;
+            color: #cbd5e0; /* text-slate-300 */
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+        .rack-cluster-label {
+            font-size: 0.65rem; /* smaller text */
+            color: #a0aec0; /* text-gray-500 */
+            text-align: center;
+        }
+
+        /* Containment specific styles */
+        .cold-aisle-door-left, .cold-aisle-door-right {
+            display: flex;
+            position: absolute;
             top: 50%;
-            transform: translateY(-50%);
+            height: 70%; /* Adjust height to fit the racks */
+            width: 2.5rem; /* Width of the door when seen from top/bottom */
+            background-color: #1e3a8a; /* Dark blue for doors */
+            border: 2px solid #2563eb; /* Blue border */
+            border-radius: 0.5rem;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+            transform-origin: center center;
+            z-index: 30;
+            white-space: nowrap;
+            padding: 0 0.25rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
         }
-        .flow-line-v {
-            width: 4px;
-            left: 50%;
-            transform: translateX(-50%);
+
+        .cold-aisle-door-left {
+            left: 0;
+            transform: translateY(-50%) translateX(-50%) rotate(90deg); /* Position at left end of aisle */
         }
-        .flow-arrow-down::after {
-            content: '';
+        .cold-aisle-door-right {
+            right: 0;
+            transform: translateY(-50%) translateX(50%) rotate(-90deg); /* Position at right end of aisle */
+        }
+        .containment-roof {
             position: absolute;
-            bottom: -10px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 20px; /* Height of the roof */
+            background-color: #4a5568; /* Dark gray for roof */
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            opacity: 0.8;
+            z-index: 20;
+        }
+        .cold-aisle-floor-label {
+            position: absolute;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 10px solid #58508D;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            color: #60a5fa; /* blue-400 */
+            font-size: 1rem;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+         /* Adjust rack cell placeholder width for consistency */
+        .rack-cell-placeholder {
+            width: 120px; /* Same width as rack-cell */
+            height: 300px; /* Same height as rack-cell */
+            margin-left: 1rem; /* Equivalent to gap-x-4 */
         }
     </style>
 </head>
-<body class="bg-gray-50" style="background-color: #F8F9FA;">
+<body class="bg-slate-50 text-gray-700">
 
-    <header class="text-white text-center py-12 md:py-20" style="background-color: #003F5C;">
-        <div class="container mx-auto px-4">
-            <h1 class="text-4xl md:text-6xl font-black uppercase tracking-wider">Membangun Masa Depan</h1>
-            <h2 class="text-2xl md:text-4xl font-semibold mt-2" style="color: #FFA600;">Analisis Pusat Data Full-Stack HCI</h2>
-            <p class="mt-4 max-w-3xl mx-auto text-lg text-gray-200">Sebuah penyelaman mendalam ke dalam arsitektur, biaya, dan perbandingan teknologi untuk pembangunan infrastruktur HCI 5-klaster yang kuat dan sangat tersedia.</p>
-        </div>
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-gray-800">Kajian Data Center HCI</h1>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#ringkasan" class="nav-link px-3 py-2 text-sm font-medium border-b-2 border-transparent">Ringkasan</a>
+                        <a href="#arsitektur" class="nav-link px-3 py-2 text-sm font-medium border-b-2 border-transparent">Arsitektur</a>
+                        <a href="#perangkat" class="nav-link px-3 py-2 text-sm font-medium border-b-2 border-transparent">Perangkat Keras</a>
+                        <a href="#lisensi" class="nav-link px-3 py-2 text-sm font-medium border-b-2 border-transparent">Lisensi</a>
+                        <a href="#layout" class="nav-link px-3 py-2 text-sm font-medium border-b-2 border-transparent">Tata Letak</a>
+                        <a href="#biaya" class="nav-link px-3 py-2 text-sm font-medium border-b-2 border-transparent">Estimasi Biaya</a>
+                    </div>
+                </div>
+                 <div class="md:hidden">
+                    <select id="mobile-nav" class="bg-gray-200 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                        <option value="#ringkasan">Ringkasan</option>
+                        <option value="#arsitektur">Arsitektur</option>
+                        <option value="#perangkat">Perangkat Keras</option>
+                        <option value="#lisensi">Lisensi</option>
+                        <option value="#layout">Tata Letak</option>
+                        <option value="#biaya">Estimasi Biaya</option>
+                    </select>
+                </div>
+            </div>
+        </nav>
     </header>
 
-    <main class="container mx-auto px-4 py-12">
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
 
-        <section id="overview" class="mb-16">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold" style="color: #003F5C;">Visi Proyek dalam Angka</h2>
-                <p class="text-gray-600 mt-2 max-w-2xl mx-auto">Gambaran umum tentang skala dan komponen utama dari pusat data yang diusulkan, dirancang untuk ketersediaan tinggi dan skalabilitas.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                <div class="bg-white p-8 rounded-lg shadow-lg">
-                    <span class="text-6xl font-extrabold" style="color: #BC5090;">5</span>
-                    <p class="text-xl font-semibold mt-2 text-gray-700">Klaster Fungsional</p>
-                    <p class="text-gray-500 mt-1">Jaringan, Komputasi, Basis Data, & Penyimpanan Objek.</p>
+        <!-- Ringkasan Section -->
+        <section id="ringkasan" class="text-center scroll-mt-20">
+            <h2 class="section-title">Ringkasan Eksekutif & Temuan Kunci</h2>
+            <p class="section-intro">
+                Selamat datang di dasbor interaktif untuk kajian pembangunan data center HCI. Bagian ini menyajikan temuan-temuan utama dan metrik biaya paling penting dari laporan. Kartu-kartu di bawah ini menyoroti estimasi Total Cost of Ownership (TCO) selama 3 tahun, memberikan gambaran finansial tingkat tinggi untuk membantu pengambilan keputusan strategis.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 text-left">
+                <div id="tco-card-dell" class="kpi-card">
+                    <h3 class="font-bold text-lg text-gray-800">Hardware Pilihan: DELL</h3>
+                    <p class="text-sm text-gray-500 mb-4">Total Biaya Hardware (CapEx)</p>
+                    <p class="text-4xl font-bold text-blue-600">$890,804</p>
+                    <p class="text-sm text-gray-500 mt-2">Kombinasi paling seimbang antara biaya, kepadatan, dan kinerja.</p>
                 </div>
-                <div class="bg-white p-8 rounded-lg shadow-lg">
-                    <span class="text-6xl font-extrabold" style="color: #FF6361;">10</span>
-                    <p class="text-xl font-semibold mt-2 text-gray-700">Total Rak Server</p>
-                    <p class="text-gray-500 mt-1">Konfigurasi HA penuh dengan 2 rak per klaster.</p>
+                <div id="tco-card-vmware" class="kpi-card">
+                    <h3 class="font-bold text-lg text-gray-800">Lisensi Pilihan: VMware</h3>
+                    <p class="text-sm text-gray-500 mb-4">Estimasi TCO 3 Tahun (Hardware + Lisensi)</p>
+                    <p class="text-4xl font-bold text-green-600">$6,75 Juta</p>
+                    <p class="text-sm text-gray-500 mt-2">Lebih hemat biaya untuk fitur setara dalam bundel VCF.</p>
                 </div>
-                <div class="bg-white p-8 rounded-lg shadow-lg">
-                    <span class="text-6xl font-extrabold" style="color: #FFA600;">91</span>
-                    <p class="text-xl font-semibold mt-2 text-gray-700">Total Node & Perangkat</p>
-                    <p class="text-gray-500 mt-1">Pilar perangkat keras dari infrastruktur HCI.</p>
+                 <div id="tco-card-nutanix" class="kpi-card">
+                    <h3 class="font-bold text-lg text-gray-800">Lisensi Alternatif: Nutanix</h3>
+                    <p class="text-sm text-gray-500 mb-4">Estimasi TCO 3 Tahun (Hardware + Lisensi)</p>
+                    <p class="text-4xl font-bold text-orange-600">$9,22 Juta</p>
+                    <p class="text-sm text-gray-500 mt-2">Menawarkan fleksibilitas lisensi yang lebih modular.</p>
                 </div>
             </div>
         </section>
 
-        <section id="clusters" class="mb-16">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold" style="color: #003F5C;">Anatomi 5 Klaster Fungsional</h2>
-                <p class="text-gray-600 mt-2 max-w-2xl mx-auto">Setiap klaster dirancang khusus untuk memenuhi tuntutan beban kerja yang spesifik, mulai dari jaringan berkecepatan tinggi hingga penyimpanan data berkapasitas besar.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 text-center">
-                <div class="bg-white p-6 rounded-lg shadow-md border-t-4" style="border-color: #003F5C;">
-                    <h3 class="font-bold text-lg" style="color: #003F5C;">🌐 Jaringan</h3>
-                    <p class="text-sm text-gray-500 mt-2">Tulang punggung konektivitas dengan NGFW, Load Balancer, WAF, & 100Gb Switches.</p>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-md border-t-4" style="border-color: #58508D;">
-                    <h3 class="font-bold text-lg" style="color: #58508D;">⚙️ Komputasi Besar</h3>
-                    <p class="text-sm text-gray-500 mt-2">1500 Inti, 16000 GB RAM, 500 TB SSD untuk aplikasi utama.</p>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-md border-t-4" style="border-color: #BC5090;">
-                    <h3 class="font-bold text-lg" style="color: #BC5090;">⚙️ Komputasi Kecil</h3>
-                    <p class="text-sm text-gray-500 mt-2">500 Inti, 8000 GB RAM, 500 TB SSD untuk aplikasi pendukung.</p>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-md border-t-4" style="border-color: #FF6361;">
-                    <h3 class="font-bold text-lg" style="color: #FF6361;">🗄️ Basis Data</h3>
-                    <p class="text-sm text-gray-500 mt-2">1000 Inti, 16000 GB RAM, 1 PB NVMe untuk IOPS tinggi.</p>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-md border-t-4" style="border-color: #FFA600;">
-                    <h3 class="font-bold text-lg" style="color: #FFA600;">📦 Penyimpanan Objek</h3>
-                    <p class="text-sm text-gray-500 mt-2">Dioptimalkan untuk kapasitas besar, diperkirakan 5 PB *usable*.</p>
-                </div>
-            </div>
-        </section>
-        
-        <section id="hardware" class="mb-16">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                <div class="bg-white p-8 rounded-lg shadow-lg">
-                    <h2 class="text-2xl font-bold mb-4" style="color: #003F5C;">Alokasi Ruang Rak & Jejak Fisik</h2>
-                     <p class="text-gray-600 mb-6">Visualisasi ini menunjukkan bagaimana total 176 unit rak (U) didistribusikan di antara klaster fungsional. Klaster Penyimpanan Objek membutuhkan ruang paling banyak karena jumlah node yang tinggi untuk mencapai kapasitas petabyte, sementara klaster jaringan dan komputasi kecil lebih ringkas.</p>
-                    <div class="chart-container">
-                        <canvas id="rackAllocationChart"></canvas>
+        <!-- Arsitektur Section -->
+        <section id="arsitektur" class="mt-16 md:mt-24 text-center scroll-mt-20">
+            <h2 class="section-title">Desain Arsitektur Full-Stack HCI</h2>
+            <p class="section-intro">
+                Arsitektur data center ini dirancang dengan pendekatan 5 klaster fungsional untuk mengoptimalkan kinerja, keamanan, dan pengelolaan. Setiap klaster didedikasikan untuk beban kerja spesifik. Arahkan kursor Anda ke setiap kotak klaster di bawah untuk melihat spesifikasi intinya.
+            </p>
+            <div class="max-w-4xl mx-auto p-6 bg-white rounded-xl shadow-lg">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
+                    <div class="cluster-card p-4 border-2 border-dashed border-gray-300 rounded-lg" data-tooltip="Firewall, Load Balancer, 100Gb Switches">
+                        <div class="text-3xl mb-2">🌐</div>
+                        <h3 class="font-semibold text-gray-800">Jaringan</h3>
+                        <p class="text-xs text-gray-500">Konektivitas & Keamanan</p>
                     </div>
-                </div>
-                <div class="text-center md:text-left">
-                    <div class="bg-white p-8 rounded-lg shadow-lg mb-6">
-                        <p class="text-gray-600 text-lg">Total Unit Rak</p>
-                        <p class="text-7xl font-extrabold" style="color: #58508D;">176 U</p>
+                     <div class="cluster-card p-4 border-2 border-dashed border-blue-400 rounded-lg" data-tooltip="1500 Core, 16TB RAM, 250TB SSD">
+                        <div class="text-3xl mb-2">⚙️</div>
+                        <h3 class="font-semibold text-blue-800">Compute Utama</h3>
+                        <p class="text-xs text-gray-500">Aplikasi Kritis</p>
                     </div>
-                    <div class="bg-white p-8 rounded-lg shadow-lg">
-                        <p class="text-gray-600 text-lg">Estimasi Luas Lantai</p>
-                        <p class="text-7xl font-extrabold" style="color: #BC5090;">21.6 m²</p>
-                        <p class="text-gray-500 mt-2">Hanya untuk penampungan rak, belum termasuk infrastruktur pendukung.</p>
+                     <div class="cluster-card p-4 border-2 border-dashed border-teal-400 rounded-lg" data-tooltip="500 Core, 8TB RAM, 250TB SSD">
+                        <div class="text-3xl mb-2">🛠️</div>
+                        <h3 class="font-semibold text-teal-800">Compute Pendukung</h3>
+                        <p class="text-xs text-gray-500">Aplikasi Umum</p>
+                    </div>
+                     <div class="cluster-card p-4 border-2 border-dashed border-purple-400 rounded-lg" data-tooltip="500 Core, 8TB RAM, 500TB NVMe">
+                        <div class="text-3xl mb-2">💾</div>
+                        <h3 class="font-semibold text-purple-800">Database</h3>
+                        <p class="text-xs text-gray-500">Kinerja I/O Tinggi</p>
+                    </div>
+                    <div class="cluster-card p-4 border-2 border-dashed border-orange-400 rounded-lg" data-tooltip="Min. 1 PB Kapasitas">
+                        <div class="text-3xl mb-2">📦</div>
+                        <h3 class="font-semibold text-orange-800">Object Storage</h3>
+                        <p class="text-xs text-gray-500">Backup & Arsip</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section id="hardware-comparison" class="mb-16">
-            <div class="bg-white p-8 rounded-lg shadow-lg">
-                <h2 class="text-2xl font-bold mb-4" style="color: #003F5C;">Estimasi Biaya Perangkat Keras per Vendor</h2>
-                <p class="text-gray-600 mb-6">Grafik ini menyajikan estimasi biaya perangkat keras total untuk masing-masing vendor (Dell, HPE, Lenovo), dengan rincian biaya per klaster. Harga ini adalah ilustrasi dan dapat sangat bervariasi berdasarkan negosiasi, konfigurasi spesifik, dan diskon volume.</p>
-                <div class="chart-container">
-                    <canvas id="hardwareCostChart"></canvas>
-                </div>
+        <!-- Perangkat Keras Section -->
+        <section id="perangkat" class="mt-16 md:mt-24 text-center scroll-mt-20">
+            <h2 class="section-title">Perbandingan Perangkat Keras HCI</h2>
+            <p class="section-intro">
+                Bagian ini menyediakan perbandingan interaktif antara tiga vendor perangkat keras terkemuka: Dell, HPE, dan Lenovo. Gunakan tombol di bawah untuk memfilter data pada bagan. Anda dapat membandingkan metrik kunci seperti jumlah total node server, kebutuhan ruang rak (dalam U-height), dan total konsumsi daya untuk klaster HCI. Ini membantu dalam mengevaluasi efisiensi fisik dan operasional masing-masing vendor.
+            </p>
+            <div class="flex justify-center space-x-2 md:space-x-4 mb-8">
+                <button class="vendor-btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md active" data-vendor="Dell">Dell</button>
+                <button class="vendor-btn bg-white text-gray-700 font-semibold py-2 px-4 rounded-lg shadow-md" data-vendor="HPE">HPE</button>
+                <button class="vendor-btn bg-white text-gray-700 font-semibold py-2 px-4 rounded-lg shadow-md" data-vendor="Lenovo">Lenovo</button>
             </div>
-        </section>
-        
-        <section id="licensing-hci" class="mb-16">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold" style="color: #003F5C;">Perbandingan Lisensi HCI: Nutanix vs. VMware</h2>
-                <p class="text-gray-600 mt-2 max-w-3xl mx-auto">Keputusan inti dalam proyek ini terletak pada pemilihan platform HCI. Kedua vendor menawarkan kapabilitas yang kuat namun dengan filosofi dan model lisensi yang berbeda secara fundamental, yang berdampak signifikan pada total biaya kepemilikan (TCO) dan kompleksitas operasional.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white rounded-lg shadow-xl p-8 border-l-8" style="border-color: #FF6361;">
-                    <h3 class="text-2xl font-bold mb-4">Nutanix Cloud Platform</h3>
-                    <p class="text-gray-600 mb-6">Menawarkan pendekatan *all-in-one* yang terintegrasi, menyederhanakan tumpukan teknologi dan lisensi. Ideal untuk organisasi yang mencari kesederhanaan operasional.</p>
-                    <ul class="space-y-4 text-gray-700">
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #FF6361;">✓</span><div><strong class="font-semibold">Model Lisensi:</strong> Per-inti & Per-TiB kapasitas.</div></li>
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #FF6361;">✓</span><div><strong class="font-semibold">Hypervisor:</strong> AHV disertakan tanpa biaya tambahan.</div></li>
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #FF6361;">✓</span><div><strong class="font-semibold">Penyimpanan Objek:</strong> Solusi *native* tersedia sebagai *add-on* (Nutanix Objects).</div></li>
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #FF6361;">✓</span><div><strong class="font-semibold">Manajemen:</strong> Platform tunggal terpadu (Prism).</div></li>
-                    </ul>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
+                    <h3 class="font-semibold text-center mb-4">Total Node Server (Klaster HCI)</h3>
+                    <div class="chart-container"><canvas id="hwNodesChart"></canvas></div>
                 </div>
-                <div class="bg-white rounded-lg shadow-xl p-8 border-l-8" style="border-color: #58508D;">
-                    <h3 class="text-2xl font-bold mb-4">VMware Cloud Foundation (VCF)</h3>
-                    <p class="text-gray-600 mb-6">Menyediakan platform tingkat perusahaan dengan ekosistem yang luas dan fleksibilitas *hybrid cloud*. Cocok untuk organisasi yang sudah banyak berinvestasi di ekosistem VMware.</p>
-                     <ul class="space-y-4 text-gray-700">
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #58508D;">✓</span><div><strong class="font-semibold">Model Lisensi:</strong> Langganan per-inti (min. 16 inti/CPU).</div></li>
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #58508D;">✓</span><div><strong class="font-semibold">Hypervisor:</strong> vSphere Enterprise Plus disertakan.</div></li>
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #58508D;">✓</span><div><strong class="font-semibold">Penyimpanan Objek:</strong> Memerlukan solusi pihak ketiga (biaya tambahan).</div></li>
-                        <li class="flex items-start"><span class="font-bold text-lg mr-3" style="color: #58508D;">✓</span><div><strong class="font-semibold">Catatan Penting:</strong> Lisensi kapasitas vSAN tambahan mungkin diperlukan untuk klaster padat penyimpanan.</div></li>
-                    </ul>
+                 <div class="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
+                    <h3 class="font-semibold text-center mb-4">Total Kebutuhan Ruang Rak (U-Height)</h3>
+                    <div class="chart-container"><canvas id="hwUHeightChart"></canvas></div>
+                </div>
+                 <div class="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
+                    <h3 class="font-semibold text-center mb-4">Total Konsumsi Daya (kW)</h3>
+                    <div class="chart-container"><canvas id="hwPowerChart"></canvas></div>
                 </div>
             </div>
         </section>
 
-        <section id="platform-license-comparison" class="mb-16">
-             <div class="bg-white p-8 rounded-lg shadow-lg">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                    <div>
-                        <h2 class="text-2xl font-bold mb-4" style="color: #003F5C;">Perbandingan Biaya Lisensi Platform (Estimasi Tahunan)</h2>
-                        <p class="text-gray-600 mb-6">Grafik ini membandingkan estimasi total biaya lisensi tahunan untuk platform HCI dan aplikasi terkait (manajemen basis data & penyimpanan objek) antara Nutanix dan VMware. Ini menyoroti perbedaan signifikan dalam struktur biaya dan model pengiriman solusi.</p>
-                        <p class="text-gray-600 text-sm">Estimasi biaya ini mencakup lisensi inti HCI, lisensi kapasitas penyimpanan tambahan (jika diperlukan), dan biaya lisensi untuk solusi manajemen basis data serta penyimpanan objek (baik Nutanix Objects terintegrasi atau solusi pihak ketiga untuk VMware).</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="platformLicenseChart"></canvas>
-                    </div>
-                </div>
+        <!-- Lisensi Section -->
+        <section id="lisensi" class="mt-16 md:mt-24 text-center scroll-mt-20">
+            <h2 class="section-title">Perbandingan Biaya Lisensi (Nutanix vs. VMware)</h2>
+            <p class="section-intro">
+                Biaya lisensi perangkat lunak adalah komponen signifikan dari TCO. Bagan ini membandingkan estimasi biaya lisensi tahunan antara Nutanix dan VMware untuk mencapai fungsionalitas yang setara. Perbandingan ini menyoroti dampak dari model lisensi yang berbeda: model modular Nutanix versus model bundel VMware Cloud Foundation (VCF).
+            </p>
+            <div class="bg-white p-4 sm:p-6 rounded-xl shadow-lg max-w-4xl mx-auto">
+                <h3 class="font-semibold text-center mb-4">Estimasi Biaya Lisensi Tahunan</h3>
+                 <div class="chart-container"><canvas id="licenseChart"></canvas></div>
             </div>
         </section>
 
-        <section id="network-security-licenses" class="mb-16">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold" style="color: #003F5C;">Estimasi Lisensi Jaringan & Keamanan Tahunan</h2>
-                <p class="text-gray-600 mt-2 max-w-2xl mx-auto">Selain lisensi HCI dan aplikasi, investasi yang signifikan diperlukan untuk perangkat lunak jaringan dan keamanan, memastikan pusat data terlindungi dan terkelola dengan baik.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="bg-white p-8 rounded-lg shadow-md border-t-4" style="border-color: #58508D;">
-                    <p class="text-gray-600 text-lg">Sistem Keamanan Jaringan (NGFW, LB, WAF/IDS)</p>
-                    <p class="text-5xl font-extrabold mt-2" style="color: #58508D;">$170K</p>
-                </div>
-                <div class="bg-white p-8 rounded-lg shadow-md border-t-4" style="border-color: #BC5090;">
-                    <p class="text-gray-600 text-lg">SIEM (Security Information and Event Management)</p>
-                    <p class="text-5xl font-extrabold mt-2" style="color: #BC5090;">$300K</p>
-                </div>
-                <div class="bg-white p-8 rounded-lg shadow-md border-t-4" style="border-color: #FF6361;">
-                    <p class="text-gray-600 text-lg">SOAR (Security Orchestration, Automation, Response)</p>
-                    <p class="text-5xl font-extrabold mt-2" style="color: #FF6361;">$150K</p>
-                </div>
-            </div>
-            <div class="text-center mt-8">
-                <p class="text-xl font-bold" style="color: #003F5C;">Total Lisensi Jaringan & Keamanan Tahunan: <span class="text-6xl font-extrabold" style="color: #FFA600;">$620K</span></p>
-            </div>
-        </section>
-        
-        <section id="gartner" class="mb-16">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold" style="color: #003F5C;">Dibangun dengan Pemimpin Industri</h2>
-                <p class="text-gray-600 mt-2 max-w-2xl mx-auto">Desain ini mengutamakan penggunaan teknologi dan vendor yang diakui sebagai 'Pemimpin' oleh Gartner Magic Quadrant, memastikan keandalan, inovasi, dan dukungan kelas dunia.</p>
-            </div>
-            <div class="bg-white rounded-lg shadow-lg p-8">
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                    <div>
-                        <h4 class="font-bold text-lg" style="color: #58508D;">Platform HCI</h4>
-                        <p class="mt-2 text-gray-700">Nutanix</p>
-                        <p class="mt-1 text-gray-700">VMware</p>
+        <!-- Layout Section -->
+        <section id="layout" class="mt-16 md:mt-24 text-center scroll-mt-20">
+             <h2 class="section-title">Konfigurasi Fisik & Tata Letak Rak</h2>
+             <p class="section-intro">
+                Visualisasi ini menunjukkan rencana penempatan 9 rak server dalam konfigurasi *High Availability* (HA) yang saling berhadapan di dalam sistem *rack containment* dengan pintu pengaman. Setiap klaster, termasuk komponen backupnya, ditempatkan di rak terpisah untuk toleransi kegagalan maksimum. Legenda di bawah ini memberikan ringkasan metrik infrastruktur penting.
+             </p>
+            <div class="bg-gray-800 p-4 md:p-6 rounded-xl shadow-lg max-w-6xl mx-auto relative overflow-hidden">
+                <div class="text-center mb-4 text-sm font-semibold text-gray-300">Lorong Dingin (Arah Depan)</div>
+
+                <!-- Cold Aisle Containment Structure -->
+                <div class="relative w-full border-x-4 border-b-4 border-blue-400 rounded-b-lg pb-4 bg-gray-900">
+                    <!-- Roof of cold aisle -->
+                    <div class="containment-roof"></div>
+
+                    <!-- Left Security Door -->
+                    <div class="cold-aisle-door-left">
+                        Pintu Keamanan
                     </div>
-                     <div>
-                        <h4 class="font-bold text-lg" style="color: #BC5090;">Server</h4>
-                        <p class="mt-2 text-gray-700">Dell Technologies</p>
-                        <p class="mt-1 text-gray-700">HPE</p>
-                        <p class="mt-1 text-gray-700">Lenovo</p>
+
+                    <!-- Right Security Door -->
+                    <div class="cold-aisle-door-right">
+                        Pintu Keamanan
                     </div>
-                    <div>
-                        <h4 class="font-bold text-lg" style="color: #FF6361;">Jaringan</h4>
-                        <p class="mt-2 text-gray-700">Cisco</p>
-                        <p class="mt-1 text-gray-700">Juniper Networks</p>
-                    </div>
-                     <div>
-                        <h4 class="font-bold text-lg" style="color: #FFA600;">Keamanan</h4>
-                        <p class="mt-2 text-gray-700">Palo Alto Networks</p>
-                        <p class="mt-1 text-gray-700">F5</p>
-                        <p class="mt-1 text-gray-700">Imperva</p>
+
+                    <div class="flex flex-col items-center space-y-8 py-8 px-4">
+                        <!-- Row 1 Racks -->
+                        <div class="flex justify-center flex-wrap gap-4 w-full">
+                            <div class="flex flex-col items-center">
+                                <div id="rack-1" class="rack-cell"></div>
+                                <div class="rack-label">Rak 1</div>
+                                <div class="rack-cluster-label">Jaringan A</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="rack-2" class="rack-cell"></div>
+                                <div class="rack-label">Rak 2</div>
+                                <div class="rack-cluster-label">Compute Utama A</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="rack-3" class="rack-cell"></div>
+                                <div class="rack-label">Rak 3</div>
+                                <div class="rack-cluster-label">Compute Pendukung A</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="rack-4" class="rack-cell"></div>
+                                <div class="rack-label">Rak 4</div>
+                                <div class="rack-cluster-label">Database A</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="rack-5" class="rack-cell"></div>
+                                <div class="rack-label">Rak 5</div>
+                                <div class="rack-cluster-label">Object Storage</div>
+                            </div>
+                        </div>
+
+                        <!-- Cold Aisle Floor Representation -->
+                        <div class="relative w-full h-16 bg-blue-200/50 rounded-lg flex items-center justify-center">
+                            <span class="cold-aisle-floor-label">Lorong Dingin (Cold Aisle)</span>
+                        </div>
+
+                        <!-- Row 2 Racks -->
+                        <div class="flex justify-center flex-wrap gap-4 w-full">
+                            <div class="flex flex-col items-center">
+                                <div id="rack-6" class="rack-cell"></div>
+                                <div class="rack-label">Rak 6</div>
+                                <div class="rack-cluster-label">Jaringan B</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="rack-7" class="rack-cell"></div>
+                                <div class="rack-label">Rak 7</div>
+                                <div class="rack-cluster-label">Compute Utama B</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="rack-8" class="rack-cell"></div>
+                                <div class="rack-label">Rak 8</div>
+                                <div class="rack-cluster-label">Compute Pendukung B</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="rack-9" class="rack-cell"></div>
+                                <div class="rack-label">Rak 9</div>
+                                <div class="rack-cluster-label">Database B</div>
+                            </div>
+                            <div class="rack-cell-placeholder w-[120px] h-[300px]"></div> <!-- Placeholder to balance the layout -->
+                        </div>
                     </div>
                 </div>
+
+                <div class="text-center mt-4 text-sm font-semibold text-gray-300">Lorong Panas (Arah Belakang)</div>
+            </div>
+
+            <!-- Legend for Layout -->
+            <div class="bg-white p-6 rounded-xl shadow-lg mt-8 max-w-2xl mx-auto text-left">
+                <h3 class="font-semibold text-lg text-gray-800 mb-4 text-center">Ringkasan Infrastruktur Fisik</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div><span class="font-medium text-gray-600">Total Kebutuhan Listrik:</span> <span class="font-bold text-blue-600">~22.7 kW</span></div>
+                    <div><span class="font-medium text-gray-600">Total Port Switch Dibutuhkan:</span> <span class="font-bold text-blue-600">~60 Port (10G/25G/100G)</span></div>
+                    <div><span class="font-medium text-gray-600">Total PDU Dibutuhkan:</span> <span class="font-bold text-blue-600">18 Unit</span></div>
+                    <div><span class="font-medium text-gray-600">Total Luasan Ruangan:</span> <span class="font-bold text-blue-600">~22.5 m²</span></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-4 text-center">Perhitungan ini mengasumsikan konfigurasi HA dengan perangkat Dell sebagai referensi dan mencakup area untuk rak, lorong, dan *buffer*.</p>
             </div>
         </section>
 
-         <section id="recommendations">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold" style="color: #003F5C;">Rekomendasi Strategis</h2>
-                <p class="text-gray-600 mt-2 max-w-2xl mx-auto">Langkah selanjutnya untuk memastikan implementasi yang sukses dan optimalisasi nilai investasi jangka panjang.</p>
-            </div>
-            <div class="max-w-4xl mx-auto space-y-4">
-                 <div class="bg-white p-6 rounded-lg shadow-md flex items-start">
-                    <div class="text-2xl font-bold mr-4" style="color: #003F5C;">1</div>
-                    <div>
-                        <h4 class="font-semibold text-lg text-gray-800">Evaluasi Vendor HCI</h4>
-                        <p class="text-gray-600">Lakukan analisis TCO mendalam antara Nutanix (untuk kesederhanaan) dan VMware (untuk ekosistem & fleksibilitas *hybrid cloud*).</p>
-                    </div>
+
+        <!-- Biaya Section -->
+        <section id="biaya" class="mt-16 md:mt-24 scroll-mt-20">
+            <h2 class="section-title text-center">Rincian Estimasi Biaya Komprehensif</h2>
+            <p class="section-intro">
+                Bagian ini menyajikan tabel rincian biaya yang menjadi dasar dari analisis TCO. Data ini mencakup estimasi biaya modal (CapEx) untuk perangkat keras dari ketiga vendor dan perbandingan biaya lisensi tahunan antara Nutanix dan VMware, termasuk lisensi untuk aplikasi Backup dan DLP.
+            </p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white p-4 sm:p-6 rounded-xl shadow-lg overflow-x-auto">
+                    <h3 class="font-semibold text-lg mb-4 text-center">Estimasi Biaya Perangkat Keras (USD)</h3>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Klaster</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Dell</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">HPE</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Lenovo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hardware-cost-table" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
                 </div>
-                 <div class="bg-white p-6 rounded-lg shadow-md flex items-start">
-                    <div class="text-2xl font-bold mr-4" style="color: #58508D;">2</div>
-                    <div>
-                        <h4 class="font-semibold text-lg text-gray-800">Optimalisasi Konfigurasi Node</h4>
-                        <p class="text-gray-600">Sesuaikan konfigurasi inti, memori, dan penyimpanan per klaster untuk menghindari *over-provisioning* dan mengoptimalkan biaya perangkat keras.</p>
-                    </div>
-                </div>
-                 <div class="bg-white p-6 rounded-lg shadow-md flex items-start">
-                    <div class="text-2xl font-bold mr-4" style="color: #BC5090;">3</div>
-                    <div>
-                        <h4 class="font-semibold text-lg text-gray-800">Negosiasi Lisensi Basis Data</h4>
-                        <p class="text-gray-600">Dapatkan penawaran langsung dari vendor basis data karena harga bisa sangat bervariasi dan dapat dinegosiasikan.</p>
-                    </div>
-                </div>
-                 <div class="bg-white p-6 rounded-lg shadow-md flex items-start">
-                    <div class="text-2xl font-bold mr-4" style="color: #FF6361;">4</div>
-                    <div>
-                        <h4 class="font-semibold text-lg text-gray-800">Desain Jaringan *Future-Proof*</h4>
-                        <p class="text-gray-600">Pilih perangkat jaringan yang mendukung kecepatan lebih tinggi (400GbE) untuk memastikan skalabilitas di masa depan.</p>
-                    </div>
+                 <div class="bg-white p-4 sm:p-6 rounded-xl shadow-lg overflow-x-auto">
+                    <h3 class="font-semibold text-lg mb-4 text-center">Estimasi Biaya Lisensi Tahunan (USD)</h3>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Nutanix</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">VMware</th>
+                            </tr>
+                        </thead>
+                        <tbody id="license-cost-table" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
-
     </main>
-
-    <footer class="bg-gray-800 text-white text-center py-6 mt-16">
-        <p>&copy; 2025 Analisis Pusat Data. Infografis dihasilkan berdasarkan data riset mendalam.</p>
-        <p class="text-xs text-gray-400 mt-2">Ini adalah representasi visual dari data dan tidak boleh dianggap sebagai penawaran vendor yang sebenarnya.</p>
+    
+    <footer class="bg-white mt-16 md:mt-24 border-t">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-gray-500">
+            <p>&copy; 2025 Kajian Data Center HCI. Dibuat sebagai aplikasi web interaktif.</p>
+            <p class="text-xs mt-2">Semua harga yang disajikan bersifat indikatif dan dapat bervariasi berdasarkan negosiasi, diskon volume, dan kondisi pasar aktual.</p>
+        </div>
     </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             
-            const brilliantBluesPalette = {
-                darkBlue: '#003F5C',
-                purpleBlue: '#58508D',
-                magenta: '#BC5090',
-                coral: '#FF6361',
-                orange: '#FFA600',
-            };
-
-            const wrapLabel = (label, maxWidth) => {
-                if (typeof label !== 'string') return label;
-                const words = label.split(' ');
-                const lines = [];
-                let currentLine = '';
-                words.forEach(word => {
-                    if ((currentLine + ' ' + word).length > maxWidth && currentLine.length > 0) {
-                        lines.push(currentLine);
-                        currentLine = word;
-                    } else {
-                        currentLine = currentLine ? currentLine + ' ' + word : word;
-                    }
-                });
-                lines.push(currentLine);
-                return lines;
-            };
-
-            const CHART_TOOLTIP_CONFIG = {
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            title: function(tooltipItems) {
-                                const item = tooltipItems[0];
-                                let label = item.chart.data.labels[item.dataIndex];
-                                if (Array.isArray(label)) {
-                                    return label.join(' ');
-                                } else {
-                                    return label;
-                                }
-                            }
-                        }
+            const data = {
+                hardware: {
+                    Dell: { nodes: 19, uHeight: 30, power: 9.92 },
+                    HPE: { nodes: 24, uHeight: 48, power: 6.93 },
+                    Lenovo: { nodes: 20, uHeight: 32, power: 12.32 }
+                },
+                license: {
+                    labels: ['Nutanix', 'VMware'],
+                    costs: [2711031, 1886550]
+                },
+                costs: {
+                    hardware: [
+                        { cluster: 'Jaringan', dell: 305804, hpe: 184596, lenovo: 167134 },
+                        { cluster: 'Compute Utama', dell: 225000, hpe: 480000, lenovo: 300000 },
+                        { cluster: 'Compute Pendukung', dell: 160000, hpe: 120000, lenovo: 144000 },
+                        { cluster: 'Database', dell: 50000, hpe: 160000, lenovo: 60000 },
+                        { cluster: 'Object Storage', dell: 150000, hpe: 150000, lenovo: 150000 },
+                    ],
+                    license: [
+                        { category: 'Platform HCI Inti', nutanix: 2049888, vmware: 1164800 },
+                        { category: 'File Services', nutanix: 116700, vmware: 0 },
+                        { category: 'Network & Security', nutanix: 170943, vmware: 410750 },
+                        { category: 'App Automation', nutanix: 62500, vmware: 0 },
+                        { category: 'Backup (Veeam)', nutanix: 280000, vmware: 280000 },
+                        { category: 'DLP (McAfee)', nutanix: 31000, vmware: 31000 },
+                    ]
+                },
+                rackLayouts: {
+                    'rack-1': { // Network A
+                        name: 'Jaringan A',
+                        devices: [
+                            { name: 'Cisco Nexus 93180YC-FX', uHeight: 1, brand: 'Cisco' },
+                            { name: 'Arista 7050SX3-48C8', uHeight: 1, brand: 'Arista' },
+                            { name: 'F5 BIG-IP i5800', uHeight: 1, brand: 'F5' },
+                            { name: 'Palo Alto PA-5250', uHeight: 3, brand: 'Palo Alto' }
+                        ]
+                    },
+                    'rack-2': { // Compute Utama A (5 nodes from 9 total)
+                        name: 'Compute Utama A',
+                        devices: [
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' }
+                        ]
+                    },
+                    'rack-3': { // Compute Pendukung A (4 nodes from 8 total)
+                        name: 'Compute Pendukung A',
+                        devices: [
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' }
+                        ]
+                    },
+                    'rack-4': { // Database A (1 node from 2 total)
+                        name: 'Database A',
+                        devices: [
+                            { name: 'Dell XC7625', uHeight: 2, brand: 'DELL' }
+                        ]
+                    },
+                    'rack-5': { // Object Storage (Dedicated Rack)
+                        name: 'Object Storage',
+                        devices: [
+                            { name: 'Dell ObjectScale X560/XF960', uHeight: 42, brand: 'DELL' } // Represent as a single large unit
+                        ]
+                    },
+                    'rack-6': { // Network B (Redundant)
+                        name: 'Jaringan B',
+                        devices: [
+                            { name: 'Cisco Nexus 93180YC-FX', uHeight: 1, brand: 'Cisco' },
+                            { name: 'Arista 7050SX3-48C8', uHeight: 1, brand: 'Arista' },
+                            { name: 'F5 BIG-IP i5800', uHeight: 1, brand: 'F5' },
+                            { name: 'Palo Alto PA-5250', uHeight: 3, brand: 'Palo Alto' }
+                        ]
+                    },
+                    'rack-7': { // Compute Utama B (4 nodes remaining)
+                        name: 'Compute Utama B',
+                        devices: [
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' },
+                            { name: 'Dell XC760xa', uHeight: 2, brand: 'DELL' }
+                        ]
+                    },
+                    'rack-8': { // Compute Pendukung B (4 nodes remaining)
+                        name: 'Compute Pendukung B',
+                        devices: [
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' },
+                            { name: 'Dell XC660', uHeight: 1, brand: 'DELL' }
+                        ]
+                    },
+                    'rack-9': { // Database B (1 node remaining)
+                        name: 'Database B',
+                        devices: [
+                            { name: 'Dell XC7625', uHeight: 2, brand: 'DELL' }
+                        ]
                     }
                 }
             };
 
-            const rackAllocationCtx = document.getElementById('rackAllocationChart')?.getContext('2d');
-            if(rackAllocationCtx) {
-                new Chart(rackAllocationCtx, {
-                    type: 'bar',
+            const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+
+            // Populate cost tables
+            const hwCostTableBody = document.getElementById('hardware-cost-table');
+            let hwTotal = { dell: 0, hpe: 0, lenovo: 0 };
+            data.costs.hardware.forEach(row => {
+                hwTotal.dell += row.dell;
+                hwTotal.hpe += row.hpe;
+                hwTotal.lenovo += row.lenovo;
+                hwCostTableBody.innerHTML += `
+                    <tr class="text-sm">
+                        <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">${row.cluster}</td>
+                        <td class="px-4 py-3 text-right text-gray-500">${formatCurrency(row.dell)}</td>
+                        <td class="px-4 py-3 text-right text-gray-500">${formatCurrency(row.hpe)}</td>
+                        <td class="px-4 py-3 text-right text-gray-500">${formatCurrency(row.lenovo)}</td>
+                    </tr>`;
+            });
+            hwCostTableBody.innerHTML += `
+                <tr class="bg-gray-50 font-bold">
+                    <td class="px-4 py-3 text-left text-gray-900">Total</td>
+                    <td class="px-4 py-3 text-right text-blue-600">${formatCurrency(hwTotal.dell)}</td>
+                    <td class="px-4 py-3 text-right text-gray-600">${formatCurrency(hwTotal.hpe)}</td>
+                    <td class="px-4 py-3 text-right text-gray-600">${formatCurrency(hwTotal.lenovo)}</td>
+                </tr>`;
+
+            const licenseCostTableBody = document.getElementById('license-cost-table');
+            let licenseTotal = { nutanix: 0, vmware: 0 };
+             data.costs.license.forEach(row => {
+                licenseTotal.nutanix += row.nutanix;
+                licenseTotal.vmware += row.vmware;
+                licenseCostTableBody.innerHTML += `
+                    <tr class="text-sm">
+                        <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">${row.category}</td>
+                        <td class="px-4 py-3 text-right text-gray-500">${formatCurrency(row.nutanix)}</td>
+                        <td class="px-4 py-3 text-right text-gray-500">${formatCurrency(row.vmware)}</td>
+                    </tr>`;
+            });
+             licenseCostTableBody.innerHTML += `
+                <tr class="bg-gray-50 font-bold">
+                    <td class="px-4 py-3 text-left text-gray-900">Total</td>
+                    <td class="px-4 py-3 text-right text-orange-600">${formatCurrency(licenseTotal.nutanix)}</td>
+                    <td class="px-4 py-3 text-right text-green-600">${formatCurrency(licenseTotal.vmware)}</td>
+                </tr>`;
+            
+            // Chart.js Configuration
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.plugins.tooltip.backgroundColor = '#1F2937';
+            Chart.defaults.plugins.tooltip.titleFont = { size: 14, weight: 'bold' };
+            Chart.defaults.plugins.tooltip.bodyFont = { size: 12 };
+            Chart.defaults.plugins.tooltip.padding = 10;
+            Chart.defaults.plugins.tooltip.cornerRadius = 4;
+            Chart.defaults.plugins.legend.position = 'bottom';
+
+            const charts = {};
+
+            function createChart(canvasId, type, initialData, label) {
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                return new Chart(ctx, {
+                    type: type,
                     data: {
-                        labels: ['Penyimpanan Objek', 'Komputasi Besar', 'Basis Data', 'Komputasi Kecil', 'Jaringan'].map(l => wrapLabel(l, 16)),
+                        labels: [label],
                         datasets: [{
-                            label: 'Total Unit Rak (U)',
-                            data: [64, 48, 34, 16, 14],
-                            backgroundColor: [
-                                brilliantBluesPalette.orange,
-                                brilliantBluesPalette.coral,
-                                brilliantBluesPalette.magenta,
-                                brilliantBluesPalette.purpleBlue,
-                                brilliantBluesPalette.darkBlue
-                            ],
-                            borderColor: '#ffffff',
-                            borderWidth: 2
+                            label: label,
+                            data: [initialData],
+                            backgroundColor: ['#3B82F6', '#22C55E', '#F97316'], // blue, green, orange
+                            borderColor: ['#3B82F6', '#22C55E', '#F97316'],
+                            borderWidth: 1
                         }]
                     },
                     options: {
-                        indexAxis: 'y',
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                beginAtZero: true,
-                                grid: {
-                                    color: 'rgba(0, 0, 0, 0.05)'
-                                }
-                            },
-                             y: {
-                                grid: {
-                                    display: false
-                                }
-                            }
-                        },
                         plugins: {
-                            ...CHART_TOOLTIP_CONFIG.plugins,
                             legend: {
                                 display: false
-                            },
-                        }
-                    }
-                });
-            }
-
-            const hardwareCostCtx = document.getElementById('hardwareCostChart')?.getContext('2d');
-            if (hardwareCostCtx) {
-                const nodeCounts = {
-                    computeLarge: 24,
-                    computeSmall: 16,
-                    database: 17,
-                    objectStorage: 32
-                };
-
-                const estimatedCostPerNode = {
-                    dell: {
-                        computeLarge: 30000,
-                        computeSmall: 20000,
-                        database: 45000,
-                        objectStorage: 25000
-                    },
-                    hpe: {
-                        computeLarge: 32000,
-                        computeSmall: 22000,
-                        database: 48000,
-                        objectStorage: 27000
-                    },
-                    lenovo: {
-                        computeLarge: 29000,
-                        computeSmall: 19000,
-                        database: 43000,
-                        objectStorage: 24000
-                    }
-                };
-
-                new Chart(hardwareCostCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Dell Technologies', 'HPE', 'Lenovo'].map(l => wrapLabel(l, 16)),
-                        datasets: [
-                            {
-                                label: 'Komputasi Besar',
-                                data: [
-                                    nodeCounts.computeLarge * estimatedCostPerNode.dell.computeLarge,
-                                    nodeCounts.computeLarge * estimatedCostPerNode.hpe.computeLarge,
-                                    nodeCounts.computeLarge * estimatedCostPerNode.lenovo.computeLarge
-                                ],
-                                backgroundColor: brilliantBluesPalette.purpleBlue
-                            },
-                            {
-                                label: 'Komputasi Kecil',
-                                data: [
-                                    nodeCounts.computeSmall * estimatedCostPerNode.dell.computeSmall,
-                                    nodeCounts.computeSmall * estimatedCostPerNode.hpe.computeSmall,
-                                    nodeCounts.computeSmall * estimatedCostPerNode.lenovo.computeSmall
-                                ],
-                                backgroundColor: brilliantBluesPalette.magenta
-                            },
-                            {
-                                label: 'Basis Data',
-                                data: [
-                                    nodeCounts.database * estimatedCostPerNode.dell.database,
-                                    nodeCounts.database * estimatedCostPerNode.hpe.database,
-                                    nodeCounts.database * estimatedCostPerNode.lenovo.database
-                                ],
-                                backgroundColor: brilliantBluesPalette.coral
-                            },
-                            {
-                                label: 'Penyimpanan Objek',
-                                data: [
-                                    nodeCounts.objectStorage * estimatedCostPerNode.dell.objectStorage,
-                                    nodeCounts.objectStorage * estimatedCostPerNode.hpe.objectStorage,
-                                    nodeCounts.objectStorage * estimatedCostPerNode.lenovo.objectStorage
-                                ],
-                                backgroundColor: brilliantBluesPalette.orange
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                stacked: true,
-                                grid: {
-                                    display: false
-                                }
-                            },
-                            y: {
-                                stacked: true,
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function(value) {
-                                        return '$' + (value / 1000000) + 'M';
-                                    }
-                                }
                             }
                         },
-                        plugins: {
-                            ...CHART_TOOLTIP_CONFIG.plugins,
-                            tooltip: {
-                                ...CHART_TOOLTIP_CONFIG.plugins.tooltip,
-                                callbacks: {
-                                    ...CHART_TOOLTIP_CONFIG.plugins.tooltip.callbacks,
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed.y !== null) {
-                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(context.parsed.y);
-                                        }
-                                        return label;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            const platformLicenseCtx = document.getElementById('platformLicenseChart')?.getContext('2d');
-            if (platformLicenseCtx) {
-                new Chart(platformLicenseCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Nutanix (HCI & Aplikasi)', 'VMware (HCI & Aplikasi Pihak Ketiga)'].map(l => wrapLabel(l, 16)),
-                        datasets: [{
-                            label: 'Estimasi Biaya Lisensi Tahunan',
-                            data: [1999800, 4227424],
-                            backgroundColor: [
-                                brilliantBluesPalette.coral,
-                                brilliantBluesPalette.darkBlue
-                            ],
-                            borderColor: '#ffffff',
-                            borderWidth: 2,
-                            borderRadius: 5
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
                         scales: {
-                            x: {
-                                beginAtZero: true,
-                                grid: {
-                                    display: false
-                                }
-                            },
                             y: {
                                 beginAtZero: true,
-                                ticks: {
-                                    callback: function(value) {
-                                        return '$' + (value / 1000000) + 'M';
-                                    }
+                                grid: {
+                                    color: '#E5E7EB'
                                 }
-                            }
-                        },
-                        plugins: {
-                            ...CHART_TOOLTIP_CONFIG.plugins,
-                            legend: {
-                                display: false
                             },
-                            tooltip: {
-                                ...CHART_TOOLTIP_CONFIG.plugins.tooltip,
-                                callbacks: {
-                                    ...CHART_TOOLTIP_CONFIG.plugins.tooltip.callbacks,
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed.y !== null) {
-                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(context.parsed.y);
-                                        }
-                                        return label;
-                                    }
+                            x: {
+                                grid: {
+                                    display: false
                                 }
                             }
                         }
@@ -571,68 +667,164 @@
                 });
             }
 
-            const nutanixAppLicenseCtx = document.getElementById('nutanixAppLicenseChart')?.getContext('2d');
-            if (nutanixAppLicenseCtx) {
-                new Chart(nutanixAppLicenseCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Nutanix Era (Manajemen Basis Data)', 'Nutanix Objects (Penyimpanan Objek)'].map(l => wrapLabel(l, 16)),
-                        datasets: [{
-                            label: 'Estimasi Biaya Lisensi Tahunan',
-                            data: [27200, 375000],
-                            backgroundColor: [
-                                brilliantBluesPalette.darkBlue,
-                                brilliantBluesPalette.orange
-                            ],
-                            borderColor: '#ffffff',
-                            borderWidth: 2,
-                            borderRadius: 5
-                        }]
-                    },
-                    options: {
-                        indexAxis: 'y',
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function(value) {
-                                        return '$' + (value / 1000) + 'K';
-                                    }
-                                }
-                            },
-                             y: {
-                                grid: {
-                                    display: false
-                                }
-                            }
+            function updateHardwareCharts(vendor) {
+                const vendorData = data.hardware[vendor];
+                charts.nodes.data.datasets[0].data = [vendorData.nodes];
+                charts.nodes.data.labels = [vendor];
+                charts.nodes.update();
+
+                charts.uHeight.data.datasets[0].data = [vendorData.uHeight];
+                charts.uHeight.data.labels = [vendor];
+                charts.uHeight.update();
+
+                charts.power.data.datasets[0].data = [vendorData.power];
+                charts.power.data.labels = [vendor];
+                charts.power.update();
+            }
+
+            charts.nodes = createChart('hwNodesChart', 'bar', data.hardware.Dell.nodes, 'Dell');
+            charts.uHeight = createChart('hwUHeightChart', 'bar', data.hardware.Dell.uHeight, 'Dell');
+            charts.power = createChart('hwPowerChart', 'bar', data.hardware.Dell.power, 'Dell');
+            
+            const licenseCtx = document.getElementById('licenseChart').getContext('2d');
+            charts.license = new Chart(licenseCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.license.labels,
+                    datasets: [{
+                        label: 'Biaya Lisensi Tahunan (USD)',
+                        data: data.license.costs,
+                        backgroundColor: ['#F97316', '#16A34A'],
+                        borderColor: ['#F97316', '#16A34A'],
+                        borderWidth: 1
+                    }]
+                },
+                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                         legend: {
+                            display: false
                         },
-                        plugins: {
-                            ...CHART_TOOLTIP_CONFIG.plugins,
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                ...CHART_TOOLTIP_CONFIG.plugins.tooltip,
-                                callbacks: {
-                                    ...CHART_TOOLTIP_CONFIG.plugins.tooltip.callbacks,
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed.x !== null) {
-                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.x);
-                                        }
-                                        return label;
+                        tooltip: {
+                             callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
                                     }
+                                    if (context.parsed.y !== null) {
+                                        label += formatCurrency(context.parsed.y);
+                                    }
+                                    return label;
                                 }
                             }
                         }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#E5E7EB'
+                            },
+                             ticks: {
+                                callback: function(value, index, values) {
+                                    return '$' + (value / 1000000) + ' Jt';
+                                }
+                            }
+                        },
+                         x: {
+                             grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+
+
+            const vendorButtons = document.querySelectorAll('.vendor-btn');
+            vendorButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const vendor = button.dataset.vendor;
+                    updateHardwareCharts(vendor);
+                    vendorButtons.forEach(btn => {
+                        btn.classList.remove('active', 'bg-blue-600', 'text-white');
+                        btn.classList.add('bg-white', 'text-gray-700');
+                    });
+                    button.classList.add('active', 'bg-blue-600', 'text-white');
+                     button.classList.remove('bg-white', 'text-gray-700');
+                });
+            });
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('section');
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 80) {
+                        current = section.getAttribute('id');
                     }
                 });
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').includes(current)) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+            
+            document.getElementById('mobile-nav').addEventListener('change', function(e) {
+                window.location.hash = e.target.value;
+            });
+
+            // Rack layout rendering
+            const RACK_HEIGHT_U = 42; // Standard 42U rack
+            const RACK_PIXEL_HEIGHT = 300; // Fixed pixel height for the rack-cell
+
+            function renderRackContent(rackElementId, rackData) {
+                const rackElement = document.getElementById(rackElementId);
+                if (!rackElement) return;
+
+                rackElement.innerHTML = ''; // Clear existing content
+
+                let currentU = 0;
+                // Render devices from bottom up
+                rackData.devices.forEach(device => {
+                    const deviceDiv = document.createElement('div');
+                    const deviceHeightPx = (device.uHeight / RACK_HEIGHT_U) * RACK_PIXEL_HEIGHT;
+                    deviceDiv.className = 'device-unit flex-shrink-0';
+                    deviceDiv.style.height = `${deviceHeightPx}px`;
+                    deviceDiv.innerHTML = `<span>${device.name} (${device.uHeight}U)</span><span>${device.brand.toUpperCase()}</span>`;
+                    rackElement.prepend(deviceDiv); // Use prepend to add from bottom
+                    currentU += device.uHeight;
+                });
+
+                // Fill remaining space with empty units from top
+                const remainingU = RACK_HEIGHT_U - currentU;
+                if (remainingU > 0) {
+                    const emptySpaceDiv = document.createElement('div');
+                    emptySpaceDiv.className = 'empty-space';
+                    emptySpaceDiv.style.height = `${(remainingU / RACK_HEIGHT_U) * RACK_PIXEL_HEIGHT}px`;
+                    rackElement.prepend(emptySpaceDiv); // Add empty space to the top
+                }
             }
+
+            // Render all racks
+            for (const rackId in data.rackLayouts) {
+                renderRackContent(rackId, data.rackLayouts[rackId]);
+            }
+            
         });
     </script>
 </body>
