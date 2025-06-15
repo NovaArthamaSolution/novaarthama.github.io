@@ -548,7 +548,7 @@
             // Populate cost tables
             const hwCostTableBody = document.getElementById('hardware-cost-table');
             let hwTotal = { dell: 0, hpe: 0, lenovo: 0 };
-            data.costs.hardware.forEach(row => {
+            reportData.costs.hardware.forEach(row => {
                 hwTotal.dell += row.dell;
                 hwTotal.hpe += row.hpe;
                 hwTotal.lenovo += row.lenovo;
@@ -570,7 +570,7 @@
 
             const licenseCostTableBody = document.getElementById('license-cost-table');
             let licenseTotal = { nutanix: 0, vmware: 0 };
-             data.costs.license.forEach(row => {
+             reportData.costs.license.forEach(row => {
                 licenseTotal.nutanix += row.nutanix;
                 licenseTotal.vmware += row.vmware;
                 licenseCostTableBody.innerHTML += `
